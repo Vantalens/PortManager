@@ -1,0 +1,7 @@
+PortManager.exe
+*.exe
+*.log
+*.tmp
+.env
+dist/
+bin/
