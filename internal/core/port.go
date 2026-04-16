@@ -92,16 +92,12 @@ func (pm *PortMonitor) ScanPortsWithMode(mode ScanMode) ([]PortInfo, error) {
 		return nil, err
 	}
 
-	pidSet := make(map[int32]struct{}, len(entries))
-	for _, entry := range entries {
-		pidSet[entry.PID] = struct{}{}
+	type preparedEntry struct {
+		Entry listeningEntry
+		Port  int
 	}
 
-	processNames := queryProcessNames(pidSet)
-
-	results := make([]PortInfo, 0, len(entries))
-	seenIndex := make(map[string]int, len(entries))
-
+	prepared := make([]preparedEntry, 0, len(entries))
 	for _, entry := range entries {
 		port, ok := extractPort(entry.Local)
 		if !ok {
@@ -113,6 +109,26 @@ func (pm *PortMonitor) ScanPortsWithMode(mode ScanMode) ([]PortInfo, error) {
 				continue
 			}
 		}
+
+		prepared = append(prepared, preparedEntry{Entry: entry, Port: port})
+	}
+
+	processNames := map[int32]string{}
+	if mode == ScanModeFull {
+		pidSet := make(map[int32]struct{}, len(prepared))
+		for _, item := range prepared {
+			pidSet[item.Entry.PID] = struct{}{}
+		}
+
+		processNames = queryProcessNames(pidSet)
+	}
+
+	results := make([]PortInfo, 0, len(prepared))
+	seenIndex := make(map[string]int, len(prepared))
+
+	for _, item := range prepared {
+		entry := item.Entry
+		port := item.Port
 
 		// 按端口+PID聚合，避免同一进程同一端口在不同协议下重复显示。
 		key := fmt.Sprintf("%d-%d", port, entry.PID)
