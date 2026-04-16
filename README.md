@@ -63,12 +63,16 @@ go build -ldflags "-H=windowsgui" -o PortManager.exe .
 
 发布包至少包含以下文件：
 
-- PortManager.exe
+- PortManager.exe（包含嵌入的图标和manifest）
+- PortManager.exe.manifest
+- PortManager.ico（应用图标）
 - run.bat
 - run.vbs
 - README.md
 - RELEASE.md
 - LICENSE
+
+> **注**：PortManager.exe 已通过 rsrc 工具嵌入 manifest 和图标资源，无需单独复制相应资源即可正常显示现代控件样式和应用图标。
 
 ## 项目结构
 

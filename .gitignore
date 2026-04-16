@@ -14,6 +14,10 @@
 *.old
 *.orig
 
+# build artifacts (rsrc generated)
+*.syso
+*.rsrc
+
 # env/build dirs
 .env
 dist/

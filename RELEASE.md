@@ -34,6 +34,14 @@
 - 兼容 netstat 中文状态字段（侦听）
 - 增加 Windows 输出解码处理，减少中文进程名乱码
 
+### UI 视觉样式修复
+
+- 新增 Windows manifest，启用 Common Controls v6（修复经典旧控件样式）
+- 标题字体与界面配色调整为更现代的浅色卡片风格
+- 新增应用图标设计（深蓝色网络连接主题）
+- 使用 rsrc 工具将图标和 manifest 嵌入到 exe 中
+- 支持在文件浏览器、任务栏和系统托盘中显示应用图标
+
 ## 兼容性
 
 - 系统：Windows 10/11
@@ -49,6 +57,7 @@
 ## 发行包建议内容
 
 - PortManager.exe
+- PortManager.exe.manifest
 - run.bat
 - run.vbs
 - README.md
