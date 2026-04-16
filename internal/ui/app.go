@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"portmanager/internal/core"
 	"portmanager/internal/util"
@@ -26,12 +27,14 @@ type App struct {
 	fixingBounds bool
 
 	mw           *walk.MainWindow
+	notifyIcon   *walk.NotifyIcon
 	titleLabel   *walk.Label
 	statusLabel  *walk.Label
 	countLabel   *walk.Label
 	results      *walk.ListBox
 	startupCheck *walk.CheckBox
 	portItems    []core.PortInfo
+	exiting      bool
 }
 
 func NewApp() *App {
@@ -41,10 +44,16 @@ func NewApp() *App {
 }
 
 func (a *App) Run() error {
-	const cardWidth = 420
-	const cardHeight = 500
+	const cardWidth = 460
+	const cardHeight = 560
 	bodyFontFamily := chooseBodyFontFamily()
 	headingFontFamily := chooseHeadingFontFamily()
+
+	pageBg := walk.RGB(241, 243, 246)
+	cardBg := walk.RGB(250, 251, 253)
+	headingColor := walk.RGB(22, 27, 34)
+	mutedColor := walk.RGB(108, 117, 125)
+	accentColor := walk.RGB(0, 122, 204)
 
 	window := MainWindow{
 		AssignTo: &a.mw,
@@ -57,30 +66,30 @@ func (a *App) Run() error {
 		MinSize:    Size{Width: cardWidth, Height: cardHeight},
 		MaxSize:    Size{Width: cardWidth, Height: cardHeight},
 		Visible:    false,
-		Background: SolidColorBrush{Color: walk.RGB(245, 244, 237)},
-		Layout:     VBox{Margins: Margins{Left: 12, Top: 10, Right: 12, Bottom: 10}, Spacing: 8},
+		Background: SolidColorBrush{Color: pageBg},
+		Layout:     VBox{Margins: Margins{Left: 14, Top: 12, Right: 14, Bottom: 12}, Spacing: 10},
 		Children: []Widget{
 			Composite{
-				Background: SolidColorBrush{Color: walk.RGB(250, 249, 245)},
-				Layout:     HBox{Margins: Margins{Left: 12, Top: 10, Right: 12, Bottom: 10}},
+				Background: SolidColorBrush{Color: cardBg},
+				Layout:     HBox{Margins: Margins{Left: 14, Top: 12, Right: 14, Bottom: 12}},
 				Children: []Widget{
-					Label{AssignTo: &a.titleLabel, Text: "PortManager", Font: Font{Family: headingFontFamily, PointSize: 16}, TextColor: walk.RGB(20, 20, 19)},
+					Label{AssignTo: &a.titleLabel, Text: "PortManager", Font: Font{Family: headingFontFamily, PointSize: 18}, TextColor: headingColor},
 					HSpacer{},
-					Label{Text: "", Font: Font{Family: bodyFontFamily, PointSize: 9}, TextColor: walk.RGB(94, 93, 89)},
+					Label{Text: "v1.1.0", Font: Font{Family: bodyFontFamily, PointSize: 9}, TextColor: mutedColor},
 				},
 			},
 			Composite{
-				Background: SolidColorBrush{Color: walk.RGB(250, 249, 245)},
-				Layout:     VBox{Margins: Margins{Left: 12, Top: 8, Right: 12, Bottom: 8}, Spacing: 6},
+				Background: SolidColorBrush{Color: cardBg},
+				Layout:     VBox{Margins: Margins{Left: 14, Top: 10, Right: 14, Bottom: 10}, Spacing: 8},
 				Children: []Widget{
-					Label{Text: "扫描", Font: Font{Family: headingFontFamily, PointSize: 12}, TextColor: walk.RGB(20, 20, 19)},
+					Label{Text: "端口扫描", Font: Font{Family: headingFontFamily, PointSize: 12}, TextColor: headingColor},
 					Composite{
 						Layout: HBox{},
 						Children: []Widget{
 							PushButton{
 								Text:    "快速扫描",
 								Font:    Font{Family: bodyFontFamily, PointSize: 10},
-								MinSize: Size{Width: 118, Height: 34},
+								MinSize: Size{Width: 126, Height: 36},
 								OnClicked: func() {
 									go a.scanPorts(core.ScanModeQuick)
 								},
@@ -88,7 +97,7 @@ func (a *App) Run() error {
 							PushButton{
 								Text:    "全面扫描",
 								Font:    Font{Family: bodyFontFamily, PointSize: 10},
-								MinSize: Size{Width: 118, Height: 34},
+								MinSize: Size{Width: 126, Height: 36},
 								OnClicked: func() {
 									go a.scanPorts(core.ScanModeFull)
 								},
@@ -96,47 +105,47 @@ func (a *App) Run() error {
 							PushButton{
 								Text:    "关闭端口",
 								Font:    Font{Family: bodyFontFamily, PointSize: 10},
-								MinSize: Size{Width: 118, Height: 34},
+								MinSize: Size{Width: 126, Height: 36},
 								OnClicked: func() {
 									a.closeSelectedPort()
 								},
 							},
 						},
 					},
-					Label{AssignTo: &a.statusLabel, Text: "准备就绪", Font: Font{Family: bodyFontFamily, PointSize: 10}, TextColor: walk.RGB(77, 76, 72)},
+					Label{AssignTo: &a.statusLabel, Text: "准备就绪", Font: Font{Family: bodyFontFamily, PointSize: 10}, TextColor: accentColor},
 				},
 			},
 			Composite{
-				Background:    SolidColorBrush{Color: walk.RGB(250, 249, 245)},
-				Layout:        VBox{Margins: Margins{Left: 12, Top: 8, Right: 12, Bottom: 8}, Spacing: 6},
+				Background:    SolidColorBrush{Color: cardBg},
+				Layout:        VBox{Margins: Margins{Left: 14, Top: 10, Right: 14, Bottom: 10}, Spacing: 8},
 				StretchFactor: 1,
 				Children: []Widget{
 					Composite{
 						Layout: HBox{},
 						Children: []Widget{
-							Label{Text: "扫描结果", Font: Font{Family: headingFontFamily, PointSize: 12}, TextColor: walk.RGB(20, 20, 19)},
+							Label{Text: "扫描结果", Font: Font{Family: headingFontFamily, PointSize: 12}, TextColor: headingColor},
 							HSpacer{},
-							Label{AssignTo: &a.countLabel, Text: "0", Font: Font{Family: headingFontFamily, PointSize: 14}, TextColor: walk.RGB(20, 20, 19)},
+							Label{AssignTo: &a.countLabel, Text: "0", Font: Font{Family: headingFontFamily, PointSize: 16}, TextColor: headingColor},
 						},
 					},
 					ListBox{
 						AssignTo:      &a.results,
 						Font:          Font{Family: bodyFontFamily, PointSize: 10},
-						MinSize:       Size{Height: 170},
+						MinSize:       Size{Height: 200},
 						Model:         []string{},
 						StretchFactor: 1,
 						ContextMenuItems: []MenuItem{
 							Action{Text: "查看端口信息与建议", OnTriggered: func() { a.showSelectedPortInsight() }},
 						},
 					},
-					Label{Text: "提示: 选择条目后可一键关闭对应端口", Font: Font{Family: bodyFontFamily, PointSize: 9}, TextColor: walk.RGB(94, 93, 89)},
+					Label{Text: "提示: 先选中条目，再执行关闭或右键分析", Font: Font{Family: bodyFontFamily, PointSize: 9}, TextColor: mutedColor},
 				},
 			},
 			Composite{
-				Background: SolidColorBrush{Color: walk.RGB(250, 249, 245)},
-				Layout:     VBox{Margins: Margins{Left: 12, Top: 8, Right: 12, Bottom: 8}, Spacing: 6},
+				Background: SolidColorBrush{Color: cardBg},
+				Layout:     VBox{Margins: Margins{Left: 14, Top: 10, Right: 14, Bottom: 10}, Spacing: 8},
 				Children: []Widget{
-					Label{Text: "设置", Font: Font{Family: headingFontFamily, PointSize: 12}, TextColor: walk.RGB(20, 20, 19)},
+					Label{Text: "设置", Font: Font{Family: headingFontFamily, PointSize: 12}, TextColor: headingColor},
 					Composite{
 						Layout: HBox{},
 						Children: []Widget{
@@ -150,15 +159,13 @@ func (a *App) Run() error {
 								},
 							},
 							HSpacer{},
-							PushButton{Text: "关于", Font: Font{Family: bodyFontFamily, PointSize: 10}, MinSize: Size{Width: 74, Height: 30}, OnClicked: func() { a.showAbout() }},
+							PushButton{Text: "关于", Font: Font{Family: bodyFontFamily, PointSize: 10}, MinSize: Size{Width: 92, Height: 32}, OnClicked: func() { a.showAbout() }},
 							PushButton{
 								Text:    "退出",
 								Font:    Font{Family: bodyFontFamily, PointSize: 10},
-								MinSize: Size{Width: 74, Height: 30},
+								MinSize: Size{Width: 92, Height: 32},
 								OnClicked: func() {
-									if a.confirmExit() {
-										a.mw.Close()
-									}
+									a.exitApp()
 								},
 							},
 						},
@@ -166,7 +173,7 @@ func (a *App) Run() error {
 					Composite{
 						Layout: HBox{},
 						Children: []Widget{
-							PushButton{Text: "刷新", Font: Font{Family: bodyFontFamily, PointSize: 10}, MinSize: Size{Width: 74, Height: 30}, OnClicked: func() { go a.scanPorts(core.ScanModeQuick) }},
+							PushButton{Text: "刷新", Font: Font{Family: bodyFontFamily, PointSize: 10}, MinSize: Size{Width: 92, Height: 32}, OnClicked: func() { go a.scanPorts(core.ScanModeQuick) }},
 							HSpacer{},
 						},
 					},
@@ -179,6 +186,19 @@ func (a *App) Run() error {
 		return err
 	}
 
+	if err := a.initTray(); err != nil {
+		return err
+	}
+
+	a.mw.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
+		if a.exiting {
+			return
+		}
+
+		*canceled = true
+		a.minimizeToTray()
+	})
+
 	if err := a.positionBottomRight(); err != nil {
 		return err
 	}
@@ -187,8 +207,101 @@ func (a *App) Run() error {
 	// Re-align once after show so final non-client size and DPI scaling are reflected.
 	_ = a.positionBottomRight()
 	a.mw.Run()
+	a.disposeTray()
 
 	return nil
+}
+
+func (a *App) initTray() error {
+	if a.mw == nil {
+		return nil
+	}
+
+	ni, err := walk.NewNotifyIcon(a.mw)
+	if err != nil {
+		return err
+	}
+
+	a.notifyIcon = ni
+	_ = ni.SetToolTip("PortManager")
+
+	if exePath, e := os.Executable(); e == nil {
+		if icon, ie := walk.NewIconFromFile(exePath); ie == nil {
+			_ = ni.SetIcon(icon)
+		}
+	}
+
+	openAction := walk.NewAction()
+	openAction.SetText("打开主界面")
+	openAction.Triggered().Attach(func() {
+		a.showFromTray()
+	})
+
+	exitAction := walk.NewAction()
+	exitAction.SetText("退出")
+	exitAction.Triggered().Attach(func() {
+		a.exitApp()
+	})
+
+	if err := ni.ContextMenu().Actions().Add(openAction); err != nil {
+		return err
+	}
+	if err := ni.ContextMenu().Actions().Add(walk.NewSeparatorAction()); err != nil {
+		return err
+	}
+	if err := ni.ContextMenu().Actions().Add(exitAction); err != nil {
+		return err
+	}
+
+	ni.MouseUp().Attach(func(x, y int, button walk.MouseButton) {
+		if button == walk.LeftButton {
+			a.showFromTray()
+		}
+	})
+
+	return ni.SetVisible(true)
+}
+
+func (a *App) minimizeToTray() {
+	if a.mw == nil {
+		return
+	}
+
+	a.mw.SetVisible(false)
+	if a.notifyIcon != nil {
+		_ = a.notifyIcon.SetVisible(true)
+	}
+}
+
+func (a *App) showFromTray() {
+	if a.mw == nil {
+		return
+	}
+
+	a.mw.Show()
+	_ = a.positionBottomRight()
+	if a.statusLabel != nil {
+		a.statusLabel.SetText("已从托盘恢复")
+	}
+}
+
+func (a *App) disposeTray() {
+	if a.notifyIcon != nil {
+		_ = a.notifyIcon.Dispose()
+		a.notifyIcon = nil
+	}
+}
+
+func (a *App) exitApp() {
+	if !a.confirmExit() {
+		return
+	}
+
+	a.exiting = true
+	a.disposeTray()
+	if a.mw != nil {
+		a.mw.Close()
+	}
 }
 
 func (a *App) handleWindowSizeChanged(targetWidth, targetHeight int) {
@@ -547,7 +660,11 @@ func (a *App) runOnUI(fn func()) {
 }
 
 func buildPortSummary(port core.PortInfo) string {
-	parts := []string{fmt.Sprintf("端口 %d", port.Port)}
+	parts := []string{}
+	if port.Protocol != "" {
+		parts = append(parts, port.Protocol)
+	}
+	parts = append(parts, fmt.Sprintf("端口 %d", port.Port))
 	if port.Process != "" {
 		parts = append(parts, port.Process)
 	}

@@ -100,7 +100,7 @@ func (pm *PortMonitor) ScanPortsWithMode(mode ScanMode) ([]PortInfo, error) {
 	processNames := queryProcessNames(pidSet)
 
 	results := make([]PortInfo, 0, len(entries))
-	seen := make(map[string]struct{}, len(entries))
+	seenIndex := make(map[string]int, len(entries))
 
 	for _, entry := range entries {
 		port, ok := extractPort(entry.Local)
@@ -114,11 +114,15 @@ func (pm *PortMonitor) ScanPortsWithMode(mode ScanMode) ([]PortInfo, error) {
 			}
 		}
 
-		key := fmt.Sprintf("%s-%d-%d", entry.Protocol, port, entry.PID)
-		if _, exists := seen[key]; exists {
+		// 按端口+PID聚合，避免同一进程同一端口在不同协议下重复显示。
+		key := fmt.Sprintf("%d-%d", port, entry.PID)
+		if idx, exists := seenIndex[key]; exists {
+			// 如果同一端口同时存在 UDP/TCP，优先保留 TCP，便于后续关闭与洞察逻辑。
+			if results[idx].Protocol == "UDP" && entry.Protocol == "TCP" {
+				results[idx].Protocol = "TCP"
+			}
 			continue
 		}
-		seen[key] = struct{}{}
 
 		name := processNames[entry.PID]
 		if name == "" {
@@ -133,6 +137,7 @@ func (pm *PortMonitor) ScanPortsWithMode(mode ScanMode) ([]PortInfo, error) {
 			Protocol: entry.Protocol,
 			State:    "OPEN",
 		})
+		seenIndex[key] = len(results) - 1
 	}
 
 	sort.Slice(results, func(i, j int) bool {
