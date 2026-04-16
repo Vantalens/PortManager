@@ -1,6 +1,6 @@
 # PortManager
 
-Windows 桌面端口管理工具（Go + Walk），聚焦三个事情：
+Windows 桌面端口管理工具（Go + Walk），聚焦：
 - 快速发现本机监听端口
 - 一键关闭选中端口
 - 对端口给出右键分析与关闭建议
